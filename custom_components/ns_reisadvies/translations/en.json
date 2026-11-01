@@ -204,6 +204,9 @@
     "sensor": {
       "delay": {
         "name": "Delay"
+      },
+      "next_train": {
+        "name": "Next train"
       }
     }
   }

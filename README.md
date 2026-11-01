@@ -232,6 +232,12 @@ triggers:
     to: [delayed, cancelled]
 ```
 
+#### Next train sensor per route (v2.21.0, fork)
+
+`sensor.<route>_next_train` shows the next trip as one line for a tile:
+`IC 08:09 +4 · spoor 3`, or `IC 08:09 vervalt` when it is cancelled
+(a `!` after the track means it changed). Attributes as the delay sensor.
+
 ## Lovelace card
 
 The card auto-registers via Lovelace resources. Add it to your

@@ -278,3 +278,24 @@ def next_departure_info(trips: list[dict[str, Any]] | None) -> dict[str, Any]:
         "status": "cancelled" if cancelled else ("delayed" if delay > 0 else "on_time"),
         "message": next((m for m in messages if m), None),
     }
+
+
+def next_departure_summary(info: dict[str, Any]) -> str | None:
+    """One short line for a tile: ``IC 08:09 +4 · spoor 3``.
+
+    ``info`` is the dict from :func:`next_departure_info`. Shows the
+    planned time and the delay, a cancellation as ``vervalt``, and the
+    track with a ``!`` when it changed. Without a trip: None.
+    """
+    if not info or info.get("status") is None:
+        return None
+    code = (info.get("train") or "").split(" ")[0]
+    parts = [p for p in (code, info.get("planned")) if p]
+    line = " ".join(parts)
+    if info.get("cancelled"):
+        return f"{line} vervalt".strip()
+    if info.get("delay"):
+        line += f" +{info['delay']}"
+    if info.get("track"):
+        line += f" · spoor {info['track']}" + ("!" if info.get("track_changed") else "")
+    return line.strip() or None

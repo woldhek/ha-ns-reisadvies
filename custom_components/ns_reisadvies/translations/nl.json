@@ -204,6 +204,9 @@
     "sensor": {
       "delay": {
         "name": "Vertraging"
+      },
+      "next_train": {
+        "name": "Volgende trein"
       }
     }
   }

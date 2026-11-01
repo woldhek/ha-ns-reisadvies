@@ -101,3 +101,20 @@ def test_cancelled() -> None:
     assert info["status"] == "cancelled"
     assert info["cancelled"] is True
     assert info["message"] == "Door een defecte trein"
+
+
+from custom_components.ns_reisadvies._filter import next_departure_summary  # noqa: E402
+
+
+def test_summary_lines() -> None:
+    assert next_departure_summary(next_departure_info([])) is None
+    on_time = next_departure_info([_dep("2026-11-02T08:09:00+0100")])
+    assert next_departure_summary(on_time) == "IC 08:09 · spoor 3"
+    late = next_departure_info([_dep(
+        "2026-11-02T08:09:00+0100",
+        leg={"origin": {"plannedDateTime": "2026-11-02T08:09:00+0100",
+                        "actualDateTime": "2026-11-02T08:13:00+0100",
+                        "plannedTrack": "3", "actualTrack": "4"}})])
+    assert next_departure_summary(late) == "IC 08:09 +4 · spoor 4!"
+    gone = next_departure_info([_dep("2026-11-02T08:09:00+0100", leg={"cancelled": True})])
+    assert next_departure_summary(gone) == "IC 08:09 vervalt"

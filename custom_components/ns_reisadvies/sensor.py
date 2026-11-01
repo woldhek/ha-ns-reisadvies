@@ -43,7 +43,7 @@ from .const import (
     DOMAIN,
     SUBENTRY_TYPE_ROUTE,
 )
-from ._filter import next_departure_info
+from ._filter import next_departure_info, next_departure_summary
 from .coordinator import NSUpdateCoordinator
 from .types import NSConfigEntry
 
@@ -104,6 +104,13 @@ async def async_setup_entry(
                 coord,
                 route_unique_id=unique_id,
                 suggested_object_id=f"{suggested}_delay",
+            )
+        )
+        by_subentry[subentry_id].append(
+            NSReisadviesNextTrainSensor(
+                coord,
+                route_unique_id=unique_id,
+                suggested_object_id=f"{suggested}_next_train",
             )
         )
 
@@ -375,3 +382,39 @@ class NSReisadviesDelaySensor(CoordinatorEntity[NSUpdateCoordinator], SensorEnti
         """Return train, times, track and status of the next trip."""
         info = self._info
         return {k: v for k, v in info.items() if k != "delay"}
+
+
+class NSReisadviesNextTrainSensor(CoordinatorEntity[NSUpdateCoordinator], SensorEntity):
+    """The route's next train as one readable line, for a tile or card.
+
+    State: ``IC 08:09 +4 · spoor 3`` (or ``IC 08:09 vervalt``). Same
+    attributes as the delay sensor, plus ``delay``.
+    """
+
+    _attr_should_poll = False
+    _attr_has_entity_name = True
+    _attr_translation_key = "next_train"
+
+    def __init__(
+        self,
+        coordinator: NSUpdateCoordinator,
+        *,
+        route_unique_id: str,
+        suggested_object_id: str | None = None,
+    ) -> None:
+        """Initialise the sensor on the route's device."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{route_unique_id}_next_train"
+        if suggested_object_id:
+            self._attr_suggested_object_id = suggested_object_id
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, route_unique_id)})
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the one-line summary, or None without a trip."""
+        return next_departure_summary(next_departure_info(self.coordinator.data))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the details of the next trip."""
+        return next_departure_info(self.coordinator.data)
