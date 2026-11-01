@@ -199,5 +199,12 @@
       "message": "Kan de NS-API niet bereiken: {error}."
     }
   },
-  "issues": {}
+  "issues": {},
+  "entity": {
+    "sensor": {
+      "delay": {
+        "name": "Vertraging"
+      }
+    }
+  }
 }

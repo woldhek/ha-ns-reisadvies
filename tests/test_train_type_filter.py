@@ -46,3 +46,58 @@ def test_case_insensitive_and_either_field() -> None:
 def test_trip_without_train_legs_is_dropped() -> None:
     trips = [{"legs": [{"product": {"type": "WALK"}}]}, {"legs": []}, {}]
     assert apply_train_type_filter(trips, ["IC"]) == []
+
+
+# --- next_departure_info (delay sensor) ---------------------------------
+
+from custom_components.ns_reisadvies._filter import next_departure_info  # noqa: E402
+
+
+def _dep(planned: str, actual: str | None = None, **extra) -> dict:
+    origin = {"plannedDateTime": planned, "plannedTrack": "3"}
+    if actual:
+        origin["actualDateTime"] = actual
+    leg = {
+        "origin": origin,
+        "product": {"type": "TRAIN", "shortCategoryName": "IC", "number": "3222"},
+    }
+    leg.update(extra.pop("leg", {}))
+    return {"legs": [leg], **extra}
+
+
+def test_no_trips() -> None:
+    info = next_departure_info([])
+    assert info["delay"] is None and info["status"] is None
+
+
+def test_on_time() -> None:
+    info = next_departure_info([_dep("2026-11-02T08:12:00+0100")])
+    assert info["delay"] == 0
+    assert info["status"] == "on_time"
+    assert info["train"] == "IC 3222"
+    assert info["planned"] == info["expected"] == "08:12"
+
+
+def test_delayed_with_track_change() -> None:
+    trip = _dep(
+        "2026-11-02T08:12:00+0100", "2026-11-02T08:16:00+0100",
+        leg={"origin": {
+            "plannedDateTime": "2026-11-02T08:12:00+0100",
+            "actualDateTime": "2026-11-02T08:16:00+0100",
+            "plannedTrack": "3", "actualTrack": "4b",
+        }},
+    )
+    info = next_departure_info([trip])
+    assert info["delay"] == 4
+    assert info["status"] == "delayed"
+    assert info["expected"] == "08:16"
+    assert info["track"] == "4b" and info["track_changed"] is True
+
+
+def test_cancelled() -> None:
+    trip = _dep("2026-11-02T08:12:00+0100", leg={"cancelled": True},
+                messages=[{"text": "Door een defecte trein"}])
+    info = next_departure_info([trip])
+    assert info["status"] == "cancelled"
+    assert info["cancelled"] is True
+    assert info["message"] == "Door een defecte trein"

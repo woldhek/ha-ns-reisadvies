@@ -215,6 +215,23 @@ on the sensor as the attribute `filter_train_types`.
 NS returns a handful of trips per search, so a strict filter can leave
 fewer rows than `max_rows`; widen the time window if you want more.
 
+#### Delay sensor per route (v2.20.0, fork)
+
+Every route also gets `sensor.<route>_delay`: the delay of its next trip
+in minutes (`0` when on time). It reads the same filtered trip list as
+the trips sensor, so a train-type or time filter applies here too.
+Attributes: `train` (`IC 3222`), `planned`, `expected` (`HH:MM`),
+`track`, `track_changed`, `cancelled`, `status` (`on_time` / `delayed` /
+`cancelled`) and `message` (NS' reason, when there is one).
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: sensor.ns_werk_delay
+    attribute: status
+    to: [delayed, cancelled]
+```
+
 ## Lovelace card
 
 The card auto-registers via Lovelace resources. Add it to your

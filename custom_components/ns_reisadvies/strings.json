@@ -226,6 +226,9 @@
     "sensor": {
       "trips": {
         "name": "Trips"
+      },
+      "delay": {
+        "name": "Delay"
       }
     }
   },

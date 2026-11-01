@@ -3,6 +3,9 @@
     "sensor": {
       "trips": {
         "default": "mdi:train"
+      },
+      "delay": {
+        "default": "mdi:clock-alert-outline"
       }
     },
     "device_tracker": {

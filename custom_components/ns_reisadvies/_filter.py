@@ -217,3 +217,64 @@ def apply_train_type_filter(
         if train_legs and all(_matches(leg) for leg in train_legs):
             kept.append(trip)
     return kept
+
+
+def next_departure_info(trips: list[dict[str, Any]] | None) -> dict[str, Any]:
+    """Summarise the first trip's departure: delay, train, track, status.
+
+    Pure helper behind the per-route delay sensor. ``trips`` is the
+    coordinator's (already filtered and sorted) trip list. Returns a dict
+    with ``delay`` (whole minutes, never negative), ``train``
+    (``"IC 3222"``), ``planned`` / ``expected`` (``"HH:MM"``), ``track``,
+    ``track_changed``, ``cancelled`` and ``status`` (``on_time`` /
+    ``delayed`` / ``cancelled``). Without a trip ``status`` is None.
+    """
+    empty: dict[str, Any] = {
+        "delay": None, "train": None, "planned": None, "expected": None,
+        "track": None, "track_changed": False, "cancelled": False,
+        "status": None, "message": None,
+    }
+    trip = next((t for t in (trips or []) if (t or {}).get("legs")), None)
+    if trip is None:
+        return empty
+    legs = trip["legs"]
+    first = legs[0] or {}
+    origin = first.get("origin") or {}
+    product = first.get("product") or {}
+
+    def _parse(iso: Any) -> datetime | None:
+        if not iso:
+            return None
+        try:
+            return datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return None
+
+    planned = _parse(origin.get("plannedDateTime"))
+    expected = _parse(origin.get("actualDateTime")) or planned
+    delay = 0
+    if planned and expected:
+        delay = max(0, round((expected - planned).total_seconds() / 60))
+
+    cancelled = bool(trip.get("status") == "CANCELLED") or any(
+        bool((leg or {}).get("cancelled")) for leg in legs
+    )
+    planned_track = origin.get("plannedTrack")
+    actual_track = origin.get("actualTrack")
+    code = product.get("shortCategoryName") or product.get("categoryCode") or ""
+    number = product.get("number") or ""
+    messages = [
+        str(m.get("text") or m.get("message") or "").strip()
+        for m in (trip.get("messages") or []) if isinstance(m, dict)
+    ]
+    return {
+        "delay": delay,
+        "train": f"{code} {number}".strip() or None,
+        "planned": planned.strftime("%H:%M") if planned else None,
+        "expected": expected.strftime("%H:%M") if expected else None,
+        "track": actual_track or planned_track,
+        "track_changed": bool(actual_track and planned_track and actual_track != planned_track),
+        "cancelled": cancelled,
+        "status": "cancelled" if cancelled else ("delayed" if delay > 0 else "on_time"),
+        "message": next((m for m in messages if m), None),
+    }

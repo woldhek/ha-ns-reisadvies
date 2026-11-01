@@ -199,5 +199,12 @@
       "message": "Could not reach the NS API: {error}."
     }
   },
-  "issues": {}
+  "issues": {},
+  "entity": {
+    "sensor": {
+      "delay": {
+        "name": "Delay"
+      }
+    }
+  }
 }

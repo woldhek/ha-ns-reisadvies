@@ -23,6 +23,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import (
     ConfigEntryNotReady,
@@ -42,6 +43,7 @@ from .const import (
     DOMAIN,
     SUBENTRY_TYPE_ROUTE,
 )
+from ._filter import next_departure_info
 from .coordinator import NSUpdateCoordinator
 from .types import NSConfigEntry
 
@@ -64,7 +66,7 @@ async def async_setup_entry(
         raise ConfigEntryNotReady("Waiting for NS Reisadvies hub")
 
     # Group sensors by subentry so we can pass config_subentry_id per add call
-    by_subentry: dict[str, list[NSReisadviesSensor]] = {}
+    by_subentry: dict[str, list[SensorEntity]] = {}
     for subentry_id, subentry in (entry.subentries or {}).items():
         if subentry.subentry_type != SUBENTRY_TYPE_ROUTE:
             continue
@@ -95,6 +97,13 @@ async def async_setup_entry(
                 route_name=route_name,
                 unique_id=unique_id,
                 suggested_object_id=suggested,
+            )
+        )
+        by_subentry[subentry_id].append(
+            NSReisadviesDelaySensor(
+                coord,
+                route_unique_id=unique_id,
+                suggested_object_id=f"{suggested}_delay",
             )
         )
 
@@ -321,3 +330,48 @@ class NSReisadviesSensor(CoordinatorEntity[NSUpdateCoordinator], SensorEntity):
             )
         self.coordinator.untrack_trip(ctx_recon)
         self.async_write_ha_state()
+
+
+class NSReisadviesDelaySensor(CoordinatorEntity[NSUpdateCoordinator], SensorEntity):
+    """Delay of the route's next trip, in minutes.
+
+    Lives on the same route device as the trips sensor and reads the same
+    (filtered) trip list, so a train-type or time filter applies here too.
+    Attributes carry the train, planned/expected time, track and
+    ``status`` (``on_time`` / ``delayed`` / ``cancelled``), so an
+    automation can trigger on a delay or a cancellation directly.
+    """
+
+    _attr_should_poll = False
+    _attr_has_entity_name = True
+    _attr_translation_key = "delay"
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+
+    def __init__(
+        self,
+        coordinator: NSUpdateCoordinator,
+        *,
+        route_unique_id: str,
+        suggested_object_id: str | None = None,
+    ) -> None:
+        """Initialise the delay sensor on the route's device."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{route_unique_id}_delay"
+        if suggested_object_id:
+            self._attr_suggested_object_id = suggested_object_id
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, route_unique_id)})
+
+    @property
+    def _info(self) -> dict[str, Any]:
+        return next_departure_info(self.coordinator.data)
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the delay in minutes, or None without a trip."""
+        return self._info["delay"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return train, times, track and status of the next trip."""
+        info = self._info
+        return {k: v for k, v in info.items() if k != "delay"}
